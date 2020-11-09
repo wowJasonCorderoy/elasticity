@@ -78,8 +78,7 @@ def get_bq_data(sql, project_id):
     import pandas_gbq
     return pandas_gbq.read_gbq(sql,
                                project_id=project_id,
-                               use_bqstorage_api=True,
-                               progress_bar_type="tqdm_notebook")
+                               use_bqstorage_api=True)
 
 
 def bq_sql_simple_site_article_elasticity():
@@ -136,3 +135,34 @@ def kmeans_diff_n(df,
         km.fit_predict(df)
         inertia_values.append(km.inertia_)
     return inertia_values
+
+
+def plot_termPlot(x, y, cmd="plot -'- w points pt '0'"):
+    import termplotlib as tpl
+    fig = tpl.figure()
+    fig.plot(x=x,
+             y=y,
+             width=50,
+             height=15,
+             plot_command="plot '-' w points pt 'o'")
+    fig.show()
+    return fig
+
+
+def write_df_to_bq(df,
+                   destination_table,
+                   project_id,
+                   chunksize=10000,
+                   verbose=True,
+                   reauth=False,
+                   if_exists='replace',
+                   private_key=None):
+    import pandas as pd
+    pd.io.gbq.to_gbq(df,
+                     destination_table=destination_table,
+                     project_id=project_id,
+                     chunksize=chunksize,
+                     verbose=verbose,
+                     reauth=reauth,
+                     if_exists=if_exists,
+                     private_key=private_key)
