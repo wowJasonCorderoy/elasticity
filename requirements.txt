@@ -63,6 +63,7 @@ pandas-gbq==0.14.0
 panel==0.10.1
 param==1.10.0
 partd==1.1.0
+patsy==0.5.1
 Pillow==8.0.1
 plotext==1.0.10
 proto-plus==1.11.0
@@ -90,6 +91,7 @@ scipy==1.5.4
 six==1.15.0
 sklearn==0.0
 sortedcontainers==2.3.0
+statsmodels==0.12.1
 tblib==1.7.0
 termplotlib==0.3.2
 threadpoolctl==2.1.0

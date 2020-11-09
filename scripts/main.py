@@ -1,5 +1,6 @@
 from google.cloud import bigquery
 from sklearn.cluster import KMeans
+import statsmodels.api as sm
 import umap
 import pandas_gbq
 import pandas as pd
@@ -73,7 +74,7 @@ for i in np.unique(df_site_cluster_pair.cluster):
     from `gcp-wow-finance-de-lab-dev.price_elasticity.elastData`
     where Site in ('{i_s}')
     """.format(i_s="', '".join(i_sites)), project_id=project)
-    models_gb = ['SalesOrg', 'Site', 'Article', 'Sales_Unit']
+    models_gb = ['Article', 'Sales_Unit']
     dict_modelData = dict(iter(dat.groupby(models_gb)))
     for key, value in dict_modelData.items():
         dict_all_models[key] = run_lm(
