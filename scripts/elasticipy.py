@@ -166,3 +166,10 @@ def write_df_to_bq(df,
                      reauth=reauth,
                      if_exists=if_exists,
                      private_key=private_key)
+
+def run_lm(x, y):
+      import statsmodels.api as sm
+      x = sm.add_constant(x)
+      mod = sm.OLS(y,x)
+      mod_fit = mod.fit()
+      return mod_fit

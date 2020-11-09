@@ -32,6 +32,8 @@ df_wide = df.pivot(index="Site",
                    columns=["Article", "Sales_Unit"],
                    values="slope")
 
+del df
+
 # fill na with column medians
 df_wide = df_wide.apply(lambda x: x.fillna(x.median()), axis=0)
 df_wide = df_wide.apply(lambda x: np.where(x < -10, -10, x))
@@ -56,3 +58,26 @@ df_site_cluster_pair = pd.DataFrame({
 
 write_df_to_bq(df_site_cluster_pair, "price_elasticity.site_cluster",
                "gcp-wow-finance-de-lab-dev")
+
+## Run 1 model per cluster, article, sales_unit
+dict_cluster_models = dict()
+for i in np.unique(df_site_cluster_pair.cluster):
+    print(i)
+    i_sites = list(
+        df_site_cluster_pair[df_site_cluster_pair.cluster == i]['site'])
+    dat = get_bq_data("""
+    select
+    Article, Sales_Unit,
+    log_ASP_v_lag,
+    log_Sales_Qty_SUoM_v_lag 
+    from `gcp-wow-finance-de-lab-dev.price_elasticity.elastData`
+    where Site in ('{i_s}')
+    """.format(i_s="', '".join(i_sites)), project_id=project)
+    models_gb = ['SalesOrg', 'Site', 'Article', 'Sales_Unit']
+    dict_modelData = dict(iter(dat.groupby(models_gb)))
+    for key, value in dict_modelData.items():
+        dict_all_models[key] = run_lm(
+            dict_modelData[key]['log_ASP_v_lag'],
+            dict_modelData[key]['log_Sales_Qty_SUoM_v_lag'])
+    dict_cluster_models[i] = dict_all_models
+    del dict_all_models
