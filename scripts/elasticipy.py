@@ -116,3 +116,24 @@ def bq_get_article_coef(
         sql="SELECT SalesOrg, Site,Article, Sales_Unit, y_intercept, slope FROM `gcp-wow-finance-de-lab-dev.price_elasticity.site_article_elasticity`",
         project_id=None):
     return get_bq_data(sql, project_id=project_id)
+
+def kmeans_diff_n(df,
+                n_clusters=[1],
+                max_iter=300,
+                tol=1e-04,
+                init='k-means++',
+                n_init=10,
+                algorithm='auto'):
+    from sklearn.cluster import KMeans
+    inertia_values = []
+    for i in n_clusters:
+        km = KMeans(n_clusters=i,
+                    max_iter=max_iter,
+                    tol=tol,
+                    init=init,
+                    n_init=n_init,
+                    random_state=1,
+                    algorithm=algorithm)
+        km.fit_predict(df)
+        inertia_values.append(km.inertia_)
+    return inertia_values
