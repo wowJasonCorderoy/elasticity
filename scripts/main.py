@@ -15,7 +15,7 @@ print("Client creating using default project: {}".format(client.project))
 # Create the main elasticity data table in gcp?
 # no need to recreate the elasticity data every time.
 if (0):
-    run_bq(sql=bq_sql_mainData(so='1005', lagDays=7),
+    run_bq(sql=bq_sql_mainData(so=['1005'], lagDays=7),
            client=client,
            location=location)
 
@@ -35,14 +35,16 @@ df_wide = df_wide.apply(lambda x: x.fillna(x.median()), axis=0)
 df_wide = df_wide.apply(lambda x: np.where(x < -10, -10, x))
 df_wide = df_wide.apply(lambda x: np.where(x > 0, 0, x))
 
-l_clusters = [1, 20, 40, 60, 80, 100]
-kmeans_var_explained = kmeans_diff_n(df_wide, l_clusters)
-print(kmeans_var_explained)
+# find best number of clusters using elbow method:
+if (0):
+    l_clusters = [1, 20, 40, 60, 80, 100]
+    kmeans_var_explained = kmeans_diff_n(df_wide, l_clusters)
+    print(kmeans_var_explained)
 
-import termplotlib as tpl
-fig = tpl.figure()
-fig.plot(x=l_clusters, y=kmeans_var_explained, width=50, height=15)
-fig.show()
+    import termplotlib as tpl
+    fig = tpl.figure()
+    fig.plot(x=l_clusters, y=kmeans_var_explained, width=50, height=15)
+    fig.show()
 
 my_kmeans = KMeans(n_clusters=20, random_state=0).fit(df_wide)
 
@@ -51,4 +53,11 @@ df_site_cluster_pair = pd.DataFrame({
     'cluster': list(my_kmeans.labels_)
 })
 
-pd.io.gbq.to_gbq(df_site_cluster_pair,"price_elasticity.site_cluster","gcp-wow-finance-de-lab-dev", chunksize=100000, verbose=True, reauth=False, if_exists='replace', private_key=None) 
+pd.io.gbq.to_gbq(df_site_cluster_pair,
+                 "price_elasticity.site_cluster",
+                 "gcp-wow-finance-de-lab-dev",
+                 chunksize=100000,
+                 verbose=True,
+                 reauth=False,
+                 if_exists='replace',
+                 private_key=None)

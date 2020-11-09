@@ -99,12 +99,10 @@ def bq_sql_simple_site_article_elasticity():
     where abs(log_ASP_v_lag) > 0.1
     group by SalesOrg, Site, Article, Sales_Unit
     )
-    select b.Department, b.DepartmentDescription, b.Category, b.CategoryDescription, b.Sub_Category, b.Sub_CategoryDescription, b.Segment, b.SegmentDescription, b.GeneralManagerName, b.MerchandiseManagerName, b.CategoryManagerName, b.NationalBuyDepartmentCode,
-    a.*,
+    select a.*,
     a.corr_xy*a.sd_y/a.sd_x as slope,
-    a.mean_y-a.mean_x*(a.corr_xy*a.sd_y/a.sd_x) as y_intercept,
+    a.mean_y-a.mean_x*(a.corr_xy*a.sd_y/a.sd_x) as y_intercept
     from dat a
-    left join `gcp-wow-ent-im-tbl-prod.adp_masterdata_view.dim_article_hierarchy_curr_v` b on (a.Article = b.Article) and (a.SalesOrg=b.SalesOrg)
     where a.cnt_overs >=10 and a.cnt_unders >= 10
     order by a.Article
     )
@@ -117,13 +115,14 @@ def bq_get_article_coef(
         project_id=None):
     return get_bq_data(sql, project_id=project_id)
 
+
 def kmeans_diff_n(df,
-                n_clusters=[1],
-                max_iter=300,
-                tol=1e-04,
-                init='k-means++',
-                n_init=10,
-                algorithm='auto'):
+                  n_clusters=[1],
+                  max_iter=300,
+                  tol=1e-04,
+                  init='k-means++',
+                  n_init=10,
+                  algorithm='auto'):
     from sklearn.cluster import KMeans
     inertia_values = []
     for i in n_clusters:
