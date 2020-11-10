@@ -102,7 +102,7 @@ def bq_sql_simple_site_article_elasticity():
     a.corr_xy*a.sd_y/a.sd_x as slope,
     a.mean_y-a.mean_x*(a.corr_xy*a.sd_y/a.sd_x) as y_intercept
     from dat a
-    where a.cnt_overs >=10 and a.cnt_unders >= 10
+    where (ifnull(a.cnt_overs,0)+ifnull(a.cnt_unders,0))>=10
     order by a.Article
     )
     """
@@ -111,8 +111,9 @@ def bq_sql_simple_site_article_elasticity():
 
 def bq_get_article_coef(
         sql="SELECT SalesOrg, Site,Article, Sales_Unit, y_intercept, slope FROM `gcp-wow-finance-de-lab-dev.price_elasticity.site_article_elasticity`",
+        where_clause="",
         project_id=None):
-    return get_bq_data(sql, project_id=project_id)
+    return get_bq_data(sql+" "+where_clause, project_id=project_id)
 
 
 def kmeans_diff_n(df,
