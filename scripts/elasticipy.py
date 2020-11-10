@@ -113,7 +113,7 @@ def bq_get_article_coef(
         sql="SELECT SalesOrg, Site,Article, Sales_Unit, y_intercept, slope FROM `gcp-wow-finance-de-lab-dev.price_elasticity.site_article_elasticity`",
         where_clause="",
         project_id=None):
-    return get_bq_data(sql+" "+where_clause, project_id=project_id)
+    return get_bq_data(sql + " " + where_clause, project_id=project_id)
 
 
 def kmeans_diff_n(df,
@@ -168,9 +168,38 @@ def write_df_to_bq(df,
                      if_exists=if_exists,
                      private_key=private_key)
 
+
 def run_lm(x, y):
-      import statsmodels.api as sm
-      x = sm.add_constant(x)
-      mod = sm.OLS(y,x)
-      mod_fit = mod.fit()
-      return mod_fit
+    import statsmodels.api as sm
+    x = sm.add_constant(x)
+    mod = sm.OLS(y, x)
+    mod_fit = mod.fit()
+    return mod_fit
+
+
+def getBucket(project, bucket_name):
+    from google.cloud import storage
+
+    client = storage.Client(project=project)
+    print("Client created using default project: {}".format(client.project))
+    try:
+        bucket = client.create_bucket(bucket_name)
+        print("Bucket {} created.".format(bucket.name))
+    except:
+        print("Bucket already exists. No bucket created.")
+
+    bucket = client.get_bucket(bucket_name)
+    return bucket
+
+
+def save_pickle_to_gStorage(bucket, obj, pickle_fname="dict_cluster_models.pickle"):
+    import pickle
+    with open(pickle_fname, 'wb') as handle:
+        pickle.dump(obj,
+                    handle,
+                    protocol=pickle.HIGHEST_PROTOCOL)
+    blob_name = pickle_fname
+    blob = bucket.blob(pickle_fname)
+    blob.upload_from_filename(pickle_fname)
+    os.system("rm {}".format(pickle_fname))
+    return True
