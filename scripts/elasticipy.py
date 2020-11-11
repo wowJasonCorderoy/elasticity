@@ -171,7 +171,7 @@ def write_df_to_bq(df,
 
 def run_lm(x, y):
     import statsmodels.api as sm
-    x = sm.add_constant(x)
+    x = sm.add_constant(x, has_constant='add')
     mod = sm.OLS(y, x)
     mod_fit = mod.fit()
     return mod_fit
@@ -194,6 +194,7 @@ def getBucket(project, bucket_name):
 
 def save_pickle_to_gStorage(bucket, obj, pickle_fname="dict_cluster_models.pickle"):
     import pickle
+    import os
     with open(pickle_fname, 'wb') as handle:
         pickle.dump(obj,
                     handle,

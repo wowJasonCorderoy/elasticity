@@ -4,8 +4,10 @@ import statsmodels.api as sm
 import umap
 import pandas_gbq
 import pandas as pd
+import pickle
 import numpy as np
 import sys
+import os
 sys.path.append("scripts")
 from elasticipy import *
 import termplotlib as tpl
@@ -37,9 +39,11 @@ df_wide = df.pivot(index="Site",
 
 del df
 
+# drop column if all na's
+df_wide = df_wide.dropna(axis=1, how='all')
 # fill na with column medians
-df_wide = df_wide.apply(lambda x: x.fillna(x.median()), axis=0)
-df_wide = df_wide.apply(lambda x: np.where(x.isna(), 0, x))
+df_wide = df_wide.replace([np.inf, -np.inf], np.nan)
+df_wide = df_wide.apply(lambda x: x.fillna(x.median()))
 df_wide = df_wide.apply(lambda x: np.where(x < -10, -10, x))
 df_wide = df_wide.apply(lambda x: np.where(x > 0, 0, x))
 
@@ -66,8 +70,12 @@ df_site_cluster_pair = pd.DataFrame({
 write_df_to_bq(df_site_cluster_pair, "price_elasticity.site_cluster",
                "gcp-wow-finance-de-lab-dev")
 
+bucket = getBucket(project="gcp-wow-finance-de-lab-dev",
+                   bucket_name="article_elasticity")
+
 ## Run 1 model per cluster, article, sales_unit
 dict_cluster_models = {}
+list_bucket_files = []
 for i in np.unique(df_site_cluster_pair.cluster):
     dict_all_models = {}
     print(i)
@@ -88,11 +96,54 @@ for i in np.unique(df_site_cluster_pair.cluster):
         dict_all_models[key] = run_lm(
             dict_modelData[key]['log_ASP_v_lag'],
             dict_modelData[key]['log_Sales_Qty_SUoM_v_lag'])
-    dict_cluster_models[i] = dict_all_models
+    fname = "_".join(run4salesOrgs) + "_cluster_" + str(
+        i) + "_dict_cluster_models.pickle"
+    save_pickle_to_gStorage(obj=dict_all_models,
+                            pickle_fname="_".join(run4salesOrgs) +
+                            "_cluster_" + str(i) +
+                            "_dict_cluster_models.pickle",
+                            bucket=bucket)
+    list_bucket_files.append(fname)
+    # dict_cluster_models[i] = dict_all_models
 
-bucket = getBucket(project="gcp-wow-finance-de-lab-dev",
-                   bucket_name="article_elasticity")
+for i in range(len(list_bucket_files)):
+    fname = list_bucket_files[i]
+    print(fname)
+    bb = bucket.blob(fname)
+    bb.download_to_filename(fname)
+    file_to_read = open(fname, "rb")
+    tempDict = pickle.load(file_to_read)
+    df_models = pd.DataFrame.from_dict(tempDict.keys()).reset_index()
+    df_models.columns = ['index_x'] + models_gb
+    df_models = df_models.drop(columns='index_x')
+    df_models['cluster'] = re.search(".*cluster_(.*)_dict_.*", fname,
+                                     re.IGNORECASE).group(1)
+    df_models['intercept'] = [tempDict[x].params[0] for x in tempDict.keys()]
+    df_models['coef_log_ASP_v_lag7'] = [
+        tempDict[x].params[1] for x in tempDict.keys()
+    ]
+    df_models['conf_int_025_intercept'] = [
+        tempDict[x].conf_int(alpha=0.05).iloc[0, 0] for x in tempDict.keys()
+    ]
+    df_models['conf_int_975_intercept'] = [
+        tempDict[x].conf_int(alpha=0.05).iloc[0, 1] for x in tempDict.keys()
+    ]
+    df_models['conf_int_025_coef_log_ASP_v_lag7'] = [
+        tempDict[x].conf_int(alpha=0.05).iloc[1, 0] for x in tempDict.keys()
+    ]
+    df_models['conf_int_975_coef_log_ASP_v_lag7'] = [
+        tempDict[x].conf_int(alpha=0.05).iloc[1, 1] for x in tempDict.keys()
+    ]
+    if i == 0:
+        df_all_models = df_models
+    else:
+        df_all_models = pd.concat([df_all_models, df_models])
+    os.system("rm {}".format(fname))
 
-save_pickle_to_gStorage(obj=dict_cluster_models,
-                        pickle_fname="dict_cluster_models.pickle",
+save_pickle_to_gStorage(obj=df_all_models,
+                        pickle_fname="_".join(run4salesOrgs) +
+                        "_df_all_models.pickle",
                         bucket=bucket)
+
+write_df_to_bq(df_all_models, "price_elasticity.cluster_elasticity",
+               "gcp-wow-finance-de-lab-dev")
