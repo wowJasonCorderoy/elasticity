@@ -17,11 +17,11 @@ project = "gcp-wow-finance-de-lab-dev"
 client = bigquery.Client(location=location, project=project)
 print("Client creating using default project: {}".format(client.project))
 
-run4salesOrgs = ['1030']
+run4salesOrgs = ['1005','1030']
 
 # Create the main elasticity data table in gcp?
 # no need to recreate the elasticity data every time.
-if (1):
+if (0):
     run_bq(sql=bq_sql_mainData(so=run4salesOrgs, lagDays=7),
            client=client,
            location=location)
@@ -48,7 +48,7 @@ df_wide = df_wide.apply(lambda x: np.where(x < -10, -10, x))
 df_wide = df_wide.apply(lambda x: np.where(x > 0, 0, x))
 
 # find best number of clusters using elbow method:
-embedding = umap.UMAP(n_neighbors=10, n_components=5).fit_transform(df_wide)
+embedding = umap.UMAP(n_neighbors=10, n_components=20).fit_transform(df_wide)
 
 if (1):
     l_clusters = [
@@ -60,7 +60,7 @@ if (1):
 
 plot_termPlot(x=l_clusters, y=kmeans_var_explained)
 
-my_kmeans = KMeans(n_clusters=5, random_state=0).fit(df_wide)
+my_kmeans = KMeans(n_clusters=20, random_state=0).fit(df_wide)
 
 df_site_cluster_pair = pd.DataFrame({
     'site': list(df_wide.index),
