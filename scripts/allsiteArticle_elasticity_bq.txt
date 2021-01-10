@@ -1,0 +1,160 @@
+DECLARE lagDays int64 DEFAULT 7;
+DECLARE minUnders int64 DEFAULT 6;
+DECLARE minOvers int64 DEFAULT 6;
+DECLARE cats ARRAY <STRING>;
+DECLARE so ARRAY <STRING>;
+DECLARE dateFrom DATE DEFAULT '2018-07-01';
+DECLARE dateTo DATE DEFAULT '2019-06-30';
+
+SET cats = ["MEAT","MEAT CONVENIENCE"];
+SET so = ["1005","1030"];
+
+#standardSQL
+    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.elastData` as (
+    with asp_dat as
+    (
+    SELECT
+    ifnull(SalesOrg,'') as SalesOrg,
+    ifnull(Site,'') as Site,
+    ifnull(Article,'') as Article,
+    ifnull((case when Sales_Unit in ('CA1','CA2','CA3') then 'CAR' else Sales_Unit end),'') as Sales_Unit, 
+    Calendar_Day
+    , DATE_ADD(Calendar_Day, INTERVAL -lagDays DAY) as lag_Calendar_Day
+    , sum(Sales_ExclTax) as Sales_ExclTax
+    , sum(Sales_Qty_SUoM) as Sales_Qty_SUoM
+    , (case when sum(Sales_Qty_SUoM) = 0 then NULL else sum(Sales_ExclTax)/sum(Sales_Qty_SUoM) end) as ASP
+    , sum(Promo_Sales) as Promo_Sales
+    , sum(Promo_Sales_Qty_SUoM) as Promo_Sales_Qty_SUoM
+    FROM  `gcp-wow-ent-im-tbl-prod.gs_allgrp_fin_data.fin_group_profit_v`
+    WHERE
+    SalesOrg in unnest(so) AND
+    --Category_Description in UNNEST(cats) AND
+    Calendar_Day between dateFrom AND dateTo
+    group by ifnull(SalesOrg,''),
+    ifnull(Site,''),
+    ifnull(Article,''),
+    ifnull((case when Sales_Unit in ('CA1','CA2','CA3') then 'CAR' else Sales_Unit end),''), 
+    Calendar_Day
+    )
+    select a.*,
+    a.Sales_ExclTax-b.Sales_ExclTax as Sales_ExclTax_diff,
+    a.Sales_Qty_SUoM-b.Sales_Qty_SUoM as Sales_Qty_SUoM_diff,
+    b.Sales_ExclTax as Sales_ExclTax_lag,
+    b.Sales_Qty_SUoM as Sales_Qty_SUoM_lag,
+    b.ASP as ASP_lag,
+    a.ASP-b.ASP as ASP_diff,
+    (case when b.ASP = 0 then null else a.ASP/b.ASP end) as ASP_v_lag,
+    (case when b.Sales_Qty_SUoM = 0 then null else a.Sales_Qty_SUoM/b.Sales_Qty_SUoM end) as Sales_Qty_SUoM_v_lag,
+    log(case when b.ASP = 0 then null
+    when a.ASP/b.ASP < 0 then null
+    else a.ASP/b.ASP end) as log_ASP_v_lag,
+    log(case when b.Sales_Qty_SUoM = 0 then null
+    when a.Sales_Qty_SUoM/b.Sales_Qty_SUoM < 0 then null
+    else a.Sales_Qty_SUoM/b.Sales_Qty_SUoM end) as log_Sales_Qty_SUoM_v_lag,
+    (case when a.Sales_ExclTax = 0 then 0
+    when a.Promo_Sales/a.Sales_ExclTax > 1 then 1
+    else a.Promo_Sales/a.Sales_ExclTax
+    end) as promo_perc
+    from asp_dat a
+    left join (
+    SELECT *
+    from asp_dat
+    ) b
+    on (a.lag_Calendar_Day=b.Calendar_Day) AND
+    (a.SalesOrg = b.SalesOrg) and
+    (a.Site = b.Site) and
+    (a.Article=b.Article) AND
+    (a.Sales_Unit=b.Sales_Unit)
+    where
+    b.Sales_Qty_SUoM > 0 AND
+    b.Sales_Qty_SUoM is not null AND
+    (case when b.ASP = 0 then null else a.ASP/b.ASP end) between 0.25 and 4 AND
+    (case when b.ASP = 0 then null else a.ASP/b.ASP end) is not null AND
+    log(case when b.ASP = 0 then null when a.ASP/b.ASP < 0 then null else a.ASP/b.ASP end) is not null AND
+    log(case when b.Sales_Qty_SUoM = 0 then null when a.Sales_Qty_SUoM/b.Sales_Qty_SUoM < 0 then null else a.Sales_Qty_SUoM/b.Sales_Qty_SUoM end) is not null AND
+    (case when b.Sales_Qty_SUoM = 0 then null else a.Sales_Qty_SUoM/b.Sales_Qty_SUoM end) < 100 # remove non-sensicle perc growth
+    );
+
+    create temp table addit_cols as (
+    SELECT a.SalesOrg, a.Site, a.Article, a.Sales_Unit,
+    avg(a.log_ASP_v_lag) as mean_x,
+    avg(a.log_Sales_Qty_SUoM_v_lag) as mean_y,
+    corr(a.log_ASP_v_lag, log_Sales_Qty_SUoM_v_lag) as corr_xy,
+    stddev(a.log_ASP_v_lag) as sd_x,
+    stddev(a.log_Sales_Qty_SUoM_v_lag) as sd_y,
+    sum(case when a.log_ASP_v_lag > 0.1 then 1 else 0 end) as cnt_overs,
+    sum(case when a.log_ASP_v_lag < -0.1 then 1 else 0 end) as cnt_unders,
+    avg(case when a.log_ASP_v_lag < -0.1 then 1 else 0 end) as perc_unders,
+    sum(Sales_ExclTax) as Sales_ExclTax,
+    sum(Sales_Qty_SUoM) as Sales_Qty_SUoM,
+    (case when sum(Sales_Qty_SUoM) = 0 then null else sum(Sales_ExclTax)/sum(Sales_Qty_SUoM) end) as ASP
+    FROM `gcp-wow-finance-de-lab-dev.price_elasticity.elastData` a
+    group by a.SalesOrg, a.Site, a.Article, a.Sales_Unit
+    );
+    
+    create temp table paste12mSales as (
+    #standardSQL
+    SELECT
+    ifnull(SalesOrg,'') as SalesOrg,
+    ifnull(Article,'') as Article,
+    ifnull((case when Sales_Unit in ('CA1','CA2','CA3') then 'CAR' else Sales_Unit end),'') as Sales_Unit, 
+    sum(Sales_ExclTax) as past12m_Sales_ExclTax
+    FROM  `gcp-wow-ent-im-tbl-prod.gs_allgrp_fin_data.fin_group_profit_v`
+    WHERE
+    SalesOrg in unnest(so) AND
+    --Category_Description in UNNEST(cats) and
+    Calendar_Day between DATE_SUB(CURRENT_DATE(), INTERVAL 364 DAY) and DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
+    group by ifnull(SalesOrg,''),
+    ifnull(Article,''),
+    ifnull((case when Sales_Unit in ('CA1','CA2','CA3') then 'CAR' else Sales_Unit end),'')
+    );
+    
+    create temp table int_slope as (
+    select a.*,
+    a.corr_xy*a.sd_y/a.sd_x as slope,
+    a.mean_y-a.mean_x*(a.corr_xy*a.sd_y/a.sd_x) as y_intercept
+    from addit_cols a
+    where ifnull(a.cnt_overs,0)>minOvers and ifnull(a.cnt_unders,0)>minUnders
+    order by a.SalesOrg, a.Article, a.Sales_Unit
+    );
+    
+    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.elast_dist` as (
+    select SalesOrg, Article, Sales_Unit, 
+    avg(slope) as mean_slope, stddev(slope) as stddev_slope,
+    count(*) as n
+    from int_slope
+    group by SalesOrg, Article, Sales_Unit
+    order by SalesOrg, Article, Sales_Unit
+    );
+    
+    create or replace view `gcp-wow-finance-de-lab-dev.price_elasticity.elast_dist_details` as (
+    select c.DepartmentDescription,c.CategoryDescription, c.Sub_CategoryDescription,c.SegmentDescription, c.MerchandiseManagerName, c.CategoryManagerName,
+    d.Article_Description,
+    a.*, b.past12m_Sales_ExclTax
+    from `gcp-wow-finance-de-lab-dev.price_elasticity.elast_dist` a
+    inner join
+    (
+    SELECT
+    ifnull(SalesOrg,'') as SalesOrg,
+    ifnull(Article,'') as Article,
+    ifnull((case when Sales_Unit in ('CA1','CA2','CA3') then 'CAR' else Sales_Unit end),'') as Sales_Unit, 
+    sum(Sales_ExclTax) as past12m_Sales_ExclTax
+    FROM  `gcp-wow-ent-im-tbl-prod.gs_allgrp_fin_data.fin_group_profit_v`
+    WHERE
+    Calendar_Day between DATE_SUB(CURRENT_DATE(), INTERVAL 364 DAY) and DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
+    group by ifnull(SalesOrg,''),
+    ifnull(Article,''),
+    ifnull((case when Sales_Unit in ('CA1','CA2','CA3') then 'CAR' else Sales_Unit end),'')
+    ) b on (a.SalesOrg=b.SalesOrg) and (a.Article=b.Article) and (a.Sales_Unit=b.Sales_Unit)
+    inner join
+    `gcp-wow-ent-im-tbl-prod.adp_masterdata_view.dim_article_hierarchy_curr_v` c on (a.SalesOrg=c.SalesOrg) and (a.Article=c.Article)
+    inner join (
+    select distinct  ifnull(SalesOrg,'') as SalesOrg, ifnull(Article,'') as Article,  ifnull(Article_Description,'') as Article_Description
+    from `gcp-wow-ent-im-tbl-prod.gs_allgrp_fin_data.fin_group_profit_v`
+    ) d  on (a.SalesOrg=d.SalesOrg) and (a.Article=d.Article)
+    order by past12m_Sales_ExclTax desc
+    );
+        
+
+
+
