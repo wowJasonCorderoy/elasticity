@@ -130,7 +130,7 @@ SET so = ["1005","1030"];
     create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` as (
     select c.DepartmentDescription,c.CategoryDescription, c.Sub_CategoryDescription,c.SegmentDescription, c.MerchandiseManagerName, c.CategoryManagerName,
     d.Article_Description,
-    a.*, b.past12m_Sales_ExclTax
+    a.*, b.past12m_Sales_ExclTax, b.past4w_Sales_ExclTax, b.past13w_Sales_ExclTax
     from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist` a
     inner join
     (
