@@ -123,8 +123,8 @@ SET so = ["1005","1030"];
     avg(slope) as mean_slope, stddev(slope) as stddev_slope,
     count(*) as n
     from int_slope
-    where count(*) >= 10
     group by SalesOrg, Article, Sales_Unit
+    having  count(*) >= 10
     order by SalesOrg, Article, Sales_Unit
     );
     
