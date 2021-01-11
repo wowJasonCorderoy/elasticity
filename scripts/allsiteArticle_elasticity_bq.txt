@@ -10,7 +10,7 @@ SET cats = ["MEAT","MEAT CONVENIENCE"];
 SET so = ["1005","1030"];
 
 #standardSQL
-    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.elastData` as (
+    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElastData` as (
     with asp_dat as
     (
     SELECT
@@ -88,7 +88,7 @@ SET so = ["1005","1030"];
     sum(Sales_ExclTax) as Sales_ExclTax,
     sum(Sales_Qty_SUoM) as Sales_Qty_SUoM,
     (case when sum(Sales_Qty_SUoM) = 0 then null else sum(Sales_ExclTax)/sum(Sales_Qty_SUoM) end) as ASP
-    FROM `gcp-wow-finance-de-lab-dev.price_elasticity.elastData` a
+    FROM `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElastData` a
     group by a.SalesOrg, a.Site, a.Article, a.Sales_Unit
     );
     
@@ -118,7 +118,7 @@ SET so = ["1005","1030"];
     order by a.SalesOrg, a.Article, a.Sales_Unit
     );
     
-    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.elast_dist` as (
+    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist` as (
     select SalesOrg, Article, Sales_Unit, 
     avg(slope) as mean_slope, stddev(slope) as stddev_slope,
     count(*) as n
@@ -127,11 +127,11 @@ SET so = ["1005","1030"];
     order by SalesOrg, Article, Sales_Unit
     );
     
-    create or replace view `gcp-wow-finance-de-lab-dev.price_elasticity.elast_dist_details` as (
+    create or replace view `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` as (
     select c.DepartmentDescription,c.CategoryDescription, c.Sub_CategoryDescription,c.SegmentDescription, c.MerchandiseManagerName, c.CategoryManagerName,
     d.Article_Description,
     a.*, b.past12m_Sales_ExclTax
-    from `gcp-wow-finance-de-lab-dev.price_elasticity.elast_dist` a
+    from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist` a
     inner join
     (
     SELECT
@@ -154,7 +154,4 @@ SET so = ["1005","1030"];
     ) d  on (a.SalesOrg=d.SalesOrg) and (a.Article=d.Article)
     order by past12m_Sales_ExclTax desc
     );
-        
-
-
 
