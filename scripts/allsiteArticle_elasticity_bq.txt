@@ -127,7 +127,7 @@ SET so = ["1005","1030"];
     order by SalesOrg, Article, Sales_Unit
     );
     
-    create or replace view `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` as (
+    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` as (
     select c.DepartmentDescription,c.CategoryDescription, c.Sub_CategoryDescription,c.SegmentDescription, c.MerchandiseManagerName, c.CategoryManagerName,
     d.Article_Description,
     a.*, b.past12m_Sales_ExclTax
@@ -138,7 +138,9 @@ SET so = ["1005","1030"];
     ifnull(SalesOrg,'') as SalesOrg,
     ifnull(Article,'') as Article,
     ifnull((case when Sales_Unit in ('CA1','CA2','CA3') then 'CAR' else Sales_Unit end),'') as Sales_Unit, 
-    sum(Sales_ExclTax) as past12m_Sales_ExclTax
+    sum(Sales_ExclTax) as past12m_Sales_ExclTax,
+    sum((case when Calendar_Day >= DATE_SUB(CURRENT_DATE(), INTERVAL (7*4) DAY) then Sales_ExclTax else 0 end)) as past4w_Sales_ExclTax,
+    sum((case when Calendar_Day >= DATE_SUB(CURRENT_DATE(), INTERVAL (7*13) DAY) then Sales_ExclTax else 0 end)) as past13w_Sales_ExclTax
     FROM  `gcp-wow-ent-im-tbl-prod.gs_allgrp_fin_data.fin_group_profit_v`
     WHERE
     Calendar_Day between DATE_SUB(CURRENT_DATE(), INTERVAL 364 DAY) and DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
@@ -154,4 +156,5 @@ SET so = ["1005","1030"];
     ) d  on (a.SalesOrg=d.SalesOrg) and (a.Article=d.Article)
     order by past12m_Sales_ExclTax desc
     );
+
 
