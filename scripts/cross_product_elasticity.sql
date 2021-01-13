@@ -39,7 +39,7 @@ while ARRAY_LENGTH(l_articles) > 0 DO
   --a.log_Sales_Qty_SUoM_v_lag as log_Sales_Qty_SUoM_v_lag_a, b.log_Sales_Qty_SUoM_v_lag as log_Sales_Qty_SUoM_v_lag_b,
 
   --a.pred_log_Sales_Qty_SUoM_v_lag-a.log_Sales_Qty_SUoM_v_lag as pred_residual_a,
-  b.pred_log_Sales_Qty_SUoM_v_lag-b.log_Sales_Qty_SUoM_v_lag as pred_residual_b
+  b.log_Sales_Qty_SUoM_v_lag-b.pred_log_Sales_Qty_SUoM_v_lag as pred_residual_b
 
   from (
   select * 
