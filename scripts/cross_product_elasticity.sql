@@ -1,4 +1,5 @@
 
+
 DECLARE l_articles ARRAY <STRING>;
 DECLARE alreadyRun_articles ARRAY <STRING>;
 DECLARE n INT64;
@@ -52,7 +53,7 @@ while ARRAY_LENGTH(l_articles) > 0 DO
   ) a
 
   inner join (select * from `gcp-wow-finance-de-lab-dev.price_elasticity.temp_dat` where Article not in unnest(alreadyRun_articles) and
-  Article in (select distinct Article from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` where past12m_Sales_ExclTax > minSales)
+  Article in (select distinct Article from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` where past12m_Sales_ExclTax > 1e6)
   ) b on (a.SalesOrg=b.SalesOrg) and (a.Site=b.Site) and (a.Calendar_Day=b.Calendar_Day)
   --where a.Article != b.Article and a.Sales_Unit != b.Sales_Unit
 
@@ -135,12 +136,15 @@ while ARRAY_LENGTH(l_articles) > 0 DO
 -- avg((case when a.slope>0 then 1 else 0 end)) as perc_slope_gt_0,
 -- e.median_slope,
 -- e.median_intercept,
+-- d.lift,
 -- count(*) as n,
 -- b.past12m_Sales_ExclTax as Article_a_past12m_Sales_ExclTax,
 -- c.past12m_Sales_ExclTax as Article_b_past12m_Sales_ExclTax
+
 -- from `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary` a
 -- left join `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` b on (a.SalesOrg=b.SalesOrg) and (a.Article_a=b.Article) and (a.Sales_Unit_a=b.Sales_Unit)
 -- left join `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` c on (a.SalesOrg=c.SalesOrg) and (a.Article_b=c.Article) and (a.Sales_Unit_b=c.Sales_Unit)
+-- left join `gcp-wow-finance-de-lab-dev.inflation.itemAssociationSummary001`  d on (a.Article_a=d.article_a) and (a.Article_b=d.article_b)
 
 -- left join (select distinct SalesOrg,	Article_a,	Article_b,	Sales_Unit_a,	Sales_Unit_b,
 -- percentile_cont(slope,0.5) over(partition by SalesOrg,	Article_a,	Article_b,	Sales_Unit_a,	Sales_Unit_b) as median_slope,
@@ -148,13 +152,15 @@ while ARRAY_LENGTH(l_articles) > 0 DO
 -- from `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary`) e on (a.SalesOrg=e.SalesOrg) and (a.Article_a=e.Article_a) and (a.Article_b=e.Article_b) and (a.Sales_Unit_a=e.Sales_Unit_a) and (a.Sales_Unit_b=e.Sales_Unit_b)
 -- where c.past12m_Sales_ExclTax > 1e6 and
 -- b.past12m_Sales_ExclTax > 1e6 and
--- a.Article_a != a.Article_b
+-- a.Article_a != a.Article_b and
+-- d.lift is not null
 
--- group by a.SalesOrg,	a.Article_a,	b.Article_Description, a.Article_b,	c.Article_Description, a.Sales_Unit_a,	a.Sales_Unit_b, e.median_slope, e.median_intercept, b.past12m_Sales_ExclTax, c.past12m_Sales_ExclTax
+-- group by a.SalesOrg,	a.Article_a,	b.Article_Description, a.Article_b,	c.Article_Description, a.Sales_Unit_a,	a.Sales_Unit_b, e.median_slope, e.median_intercept, d.lift, b.past12m_Sales_ExclTax, c.past12m_Sales_ExclTax
 -- having count(*) > 100
 -- ) select *
 -- from abc
 -- --where Article_a in ('133211','143737') and
 -- --Article_b in ('133211','143737')
--- order by (case when perc_slope_lt_0>perc_slope_gt_0 then perc_slope_lt_0 else perc_slope_gt_0 end)*n*( log(Article_a_past12m_Sales_ExclTax)+log(Article_b_past12m_Sales_ExclTax) ) desc
+-- order by (case when perc_slope_lt_0>perc_slope_gt_0 then perc_slope_lt_0 else perc_slope_gt_0 end)*log(n)*( log(Article_a_past12m_Sales_ExclTax)+log(Article_b_past12m_Sales_ExclTax) ) * abs(median_slope) desc
+
 
