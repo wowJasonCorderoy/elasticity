@@ -9,6 +9,9 @@ DECLARE dateTo DATE DEFAULT '2019-06-30';
 SET cats = ["MEAT","MEAT CONVENIENCE"];
 SET so = ["1005","1030"];
 
+set dateTo = CURRENT_DATE("Australia/Sydney");
+set dateFrom = DATE_ADD(dateTo, INTERVAL -364 DAY);
+
 #standardSQL
     create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElastData` as (
     with asp_dat as
@@ -29,7 +32,9 @@ SET so = ["1005","1030"];
     WHERE
     SalesOrg in unnest(so) AND
     --Category_Description in UNNEST(cats) AND
-    Calendar_Day between dateFrom AND dateTo
+    --Calendar_Day between dateFrom AND dateTo
+    Calendar_Day >= dateFrom AND 
+    Calendar_Day < dateTo
     group by ifnull(SalesOrg,''),
     ifnull(Site,''),
     ifnull(Article,''),
@@ -158,5 +163,3 @@ SET so = ["1005","1030"];
     ) d  on (a.SalesOrg=d.SalesOrg) and (a.Article=d.Article)
     order by past12m_Sales_ExclTax desc
     );
-
-
