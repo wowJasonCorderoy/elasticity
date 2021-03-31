@@ -5,8 +5,15 @@ DECLARE n FLOAT64;
 DECLARE nstring STRING;
 DECLARE minSales INT64;
 DECLARE tempString STRING;
+DECLARE tempCounter FLOAT64;
 
-############# declare functions
+######################################################## declare functions
+
+CREATE TEMP FUNCTION pasteStrings(a STRING, b STRING, c STRING)
+RETURNS STRING
+LANGUAGE js AS r"""
+return a+b+c;
+""";
 
 CREATE TEMP FUNCTION convertNumberToString(a FLOAT64)
 RETURNS STRING
@@ -47,8 +54,10 @@ LANGUAGE js AS r"""
   );`.format({i:i, backTick:"`"});
   """;
   
-#############
+######################################################## end declare functions
 
+
+######################################################## get cross product elasticities
 SET minSales = 10000000;
 SET n = 0;
 SET l_articles = ARRAY(select distinct Article from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` where past12m_Sales_ExclTax > minSales limit 5);
@@ -174,14 +183,35 @@ while ARRAY_LENGTH(l_articles) > 0 DO
     SET l_articles = ARRAY(select distinct Article from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` where past12m_Sales_ExclTax > minSales and Article not in unnest(alreadyRun_articles) limit 5);
   
   END WHILE;
-    
+
+######################################################## End get cross product elasticities
 
 
+######################################################## append those tables
 
-select count(*)
+create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary` as (
+select *
 from `gcp-wow-finance-de-lab-dev.price_elasticity.toDelete_crossProductElasticity_summary_*`
-group by Article_a
-having n > 2e6
+);
+
+######################################################## end append those tables
+
+
+##################################
+# Now delete all those temp tables
+set tempCounter = 0;
+while tempCounter <= n do
+  set tempString = pasteStrings(
+     pasteStrings("drop table `gcp-wow-finance-de-lab-dev.price_elasticity.", "toDelete_crossProductElasticity_summary_",convertNumberToString(tempCounter)),
+    "`;", "");
+   
+  EXECUTE IMMEDIATE tempString;
+
+  set tempCounter = tempCounter+1;
+
+end while;
+
+################################################################################
 
 
 
