@@ -177,6 +177,15 @@ while ARRAY_LENGTH(l_articles) > 0 DO
     
 
 
+
+select count(*)
+from `gcp-wow-finance-de-lab-dev.price_elasticity.toDelete_crossProductElasticity_summary_*`
+group by Article_a
+having n > 2e6
+
+
+
+-- #######
 -- with abc as (
 -- select a.SalesOrg,	a.Article_a,	b.Article_Description as Article_a_Description, a.Article_b,	c.Article_Description as Article_b_Description, a.Sales_Unit_a,	a.Sales_Unit_b,
 -- avg((case when a.slope<0 then 1 else 0 end)) as perc_slope_lt_0,
@@ -188,15 +197,15 @@ while ARRAY_LENGTH(l_articles) > 0 DO
 -- b.past12m_Sales_ExclTax as Article_a_past12m_Sales_ExclTax,
 -- c.past12m_Sales_ExclTax as Article_b_past12m_Sales_ExclTax
 
--- from `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary` a
+-- from `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary_*` a
 -- left join `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` b on (a.SalesOrg=b.SalesOrg) and (a.Article_a=b.Article) and (a.Sales_Unit_a=b.Sales_Unit)
 -- left join `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` c on (a.SalesOrg=c.SalesOrg) and (a.Article_b=c.Article) and (a.Sales_Unit_b=c.Sales_Unit)
--- left join `gcp-wow-finance-de-lab-dev.inflation.itemAssociationSummary001`  d on (a.Article_a=d.article_a) and (a.Article_b=d.article_b)
+-- left join `gcp-wow-finance-de-lab-dev.price_elasticity.itemAssociationPairs`  d on (a.Article_a=d.article_a) and (a.Article_b=d.article_b)
 
 -- left join (select distinct SalesOrg,	Article_a,	Article_b,	Sales_Unit_a,	Sales_Unit_b,
 -- percentile_cont(slope,0.5) over(partition by SalesOrg,	Article_a,	Article_b,	Sales_Unit_a,	Sales_Unit_b) as median_slope,
 -- percentile_cont(y_intercept,0.5) over(partition by SalesOrg,	Article_a,	Article_b,	Sales_Unit_a,	Sales_Unit_b) as median_intercept
--- from `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary`) e on (a.SalesOrg=e.SalesOrg) and (a.Article_a=e.Article_a) and (a.Article_b=e.Article_b) and (a.Sales_Unit_a=e.Sales_Unit_a) and (a.Sales_Unit_b=e.Sales_Unit_b)
+-- from `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary_*`) e on (a.SalesOrg=e.SalesOrg) and (a.Article_a=e.Article_a) and (a.Article_b=e.Article_b) and (a.Sales_Unit_a=e.Sales_Unit_a) and (a.Sales_Unit_b=e.Sales_Unit_b)
 -- where c.past12m_Sales_ExclTax > 1e6 and
 -- b.past12m_Sales_ExclTax > 1e6 and
 -- a.Article_a != a.Article_b and
@@ -208,6 +217,8 @@ while ARRAY_LENGTH(l_articles) > 0 DO
 -- from abc
 -- --where Article_a in ('133211','143737') and
 -- --Article_b in ('133211','143737')
+-- --where perc_slope_gt_0 > 0.7 or  perc_slope_lt_0 > 0.7
 -- order by (case when perc_slope_lt_0>perc_slope_gt_0 then perc_slope_lt_0 else perc_slope_gt_0 end)*log(n)*( log(Article_a_past12m_Sales_ExclTax)+log(Article_b_past12m_Sales_ExclTax) ) * abs(median_slope) desc
+
 
 
