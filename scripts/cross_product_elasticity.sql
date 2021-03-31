@@ -1,11 +1,55 @@
 
-
 DECLARE l_articles ARRAY <STRING>;
 DECLARE alreadyRun_articles ARRAY <STRING>;
-DECLARE n INT64;
+DECLARE n FLOAT64;
+DECLARE nstring STRING;
 DECLARE minSales INT64;
+DECLARE tempString STRING;
 
-SET minSales = 1000000;
+############# declare functions
+
+CREATE TEMP FUNCTION convertNumberToString(a FLOAT64)
+RETURNS STRING
+LANGUAGE js AS r"""
+return a.toString();
+""";
+
+### Create function that generates sql string for create table with different indexes
+CREATE TEMP FUNCTION genSQL(i STRING)
+RETURNS STRING
+LANGUAGE js AS r"""
+  String.prototype.format = function() {
+  var args = arguments;
+  this.unkeyed_index = 0;
+  return this.replace(/\{(\w*)\}/g, function(match, key) { 
+    if (key === '') {
+      key = this.unkeyed_index;
+      this.unkeyed_index++
+    }
+    if (key == +key) {
+      return args[key] !== 'undefined'
+      ? args[key]
+      : match;
+    } else {
+      for (var i = 0; i < args.length; i++) {
+        if (typeof args[i] === 'object' && typeof args[i][key] !== 'undefined') {
+          return args[i][key];
+        }
+      }
+      return match;
+    }
+  }.bind(this));
+};
+  
+  return `create or replace table {backTick}gcp-wow-finance-de-lab-dev.price_elasticity.toDelete_crossProductElasticity_summary_{i}{backTick} as (
+  select *
+  from {backTick}gcp-wow-finance-de-lab-dev.price_elasticity.temp_crossProductElasticity_int_slope{backTick}
+  );`.format({i:i, backTick:"`"});
+  """;
+  
+#############
+
+SET minSales = 10000000;
 SET n = 0;
 SET l_articles = ARRAY(select distinct Article from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` where past12m_Sales_ExclTax > minSales limit 5);
 SET alreadyRun_articles = [""];
@@ -29,6 +73,8 @@ create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.temp_dat` a
   );
 
 while ARRAY_LENGTH(l_articles) > 0 DO
+
+  set nstring = convertNumberToString(n);
   
   create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.temp_all_comb` as (
   #create temp table join_article_Dates as (
@@ -95,29 +141,32 @@ while ARRAY_LENGTH(l_articles) > 0 DO
   create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.temp_crossProductElasticity_int_slope` as (
   #create temp table crossProductElasticity_int_slope as (
       select a.*,
-      a.corr_xy*a.sd_y/a.sd_x as slope,
-      a.mean_y-a.mean_x*(a.corr_xy*a.sd_y/a.sd_x) as y_intercept
+      if( a.sd_x=0,Null,a.corr_xy*a.sd_y/a.sd_x ) as slope,
+      if( a.sd_x=0,Null,a.mean_y-a.mean_x*(a.corr_xy*a.sd_y/a.sd_x) ) as y_intercept
       from `gcp-wow-finance-de-lab-dev.price_elasticity.temp_crossProductElasticity` a
       #from crossProductElasticity a
       where ifnull(a.n,0)>=14
       order by a.SalesOrg,	a.Article_a,	a.Article_b,	a.Sales_Unit_a,	a.Sales_Unit_b
       );
  
-  IF n = 0 then
-      create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary` as (
-      select *
-      from `gcp-wow-finance-de-lab-dev.price_elasticity.temp_crossProductElasticity_int_slope`
-      #from crossProductElasticity_int_slope
-      );
-  ELSE
-      create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary` as (
-      select * from `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary`
-      union all
-      #(select * from crossProductElasticity_int_slope)
-      (select * from `gcp-wow-finance-de-lab-dev.price_elasticity.temp_crossProductElasticity_int_slope`)
-      );
-  END IF;
-    
+--   IF n = 0 then
+--       create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary` as (
+--       select *
+--       from `gcp-wow-finance-de-lab-dev.price_elasticity.temp_crossProductElasticity_int_slope`
+--       #from crossProductElasticity_int_slope
+--       );
+--   ELSE
+--       create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary` as (
+--       select * from `gcp-wow-finance-de-lab-dev.price_elasticity.crossProductElasticity_summary`
+--       union all
+--       #(select * from crossProductElasticity_int_slope)
+--       (select * from `gcp-wow-finance-de-lab-dev.price_elasticity.temp_crossProductElasticity_int_slope`)
+--       );
+--   END IF;
+
+    set tempString = genSQL(nstring);
+    EXECUTE IMMEDIATE tempString;
+
     SET n = n+1;
     SET alreadyRun_articles = ARRAY_CONCAT(alreadyRun_articles, l_articles);
     #SET l_articles = ARRAY(select distinct Article from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` where past12m_Sales_ExclTax > 10e6 and Article not in unnest(alreadyRun_articles) limit 10);
@@ -126,8 +175,6 @@ while ARRAY_LENGTH(l_articles) > 0 DO
   
   END WHILE;
     
-    
-
 
 
 -- with abc as (
