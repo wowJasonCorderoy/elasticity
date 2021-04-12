@@ -32,6 +32,7 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     , sum(Promo_Sales_Qty_SUoM) as Promo_Sales_Qty_SUoM
     FROM  `gcp-wow-ent-im-tbl-prod.gs_allgrp_fin_data.fin_group_profit_v`
     WHERE
+    Sales_Channel NOT IN ('HDY','HDZ','CCY','CCZ','HD1','CC1') and #instore only. This will help (later) to control for SOH issues.
     SalesOrg in unnest(so) AND
     --Category_Description in UNNEST(cats) AND
     --Calendar_Day between dateFrom AND dateTo
