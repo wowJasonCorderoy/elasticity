@@ -157,7 +157,7 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist` as (
     select a.*, 
     b.median_slope, b.median_y_intercept,
-    b.slope_quantile_10, b.slope_quantile_90, b.slope_quantile_05, b.slope_quantile_95, b.slope_quantile_01, b.slope_quantile_99
+    b.slope_quantile_25, b.slope_quantile_75, b.slope_quantile_10, b.slope_quantile_90, b.slope_quantile_05, b.slope_quantile_95, b.slope_quantile_01, b.slope_quantile_99
     from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMeans` a
     inner join
     `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMedians` b
