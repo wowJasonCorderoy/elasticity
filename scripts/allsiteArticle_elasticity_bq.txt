@@ -10,7 +10,7 @@ SET cats = ["MEAT","MEAT CONVENIENCE"];
 SET so = ["1005","1030"];
 
 set dateTo = CURRENT_DATE("Australia/Sydney");
-set dateFrom = DATE_ADD(dateTo, INTERVAL -364 DAY);
+set dateFrom = DATE_ADD(dateTo, INTERVAL -(364*2) DAY);
 
 CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case when denominator=0 or denominator is null then null else numerator/denominator end));
 
@@ -127,7 +127,14 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     order by a.SalesOrg, a.Article, a.Sales_Unit
     );
     
-    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist` as (
+    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMedians` as (
+    select distinct SalesOrg, Article, Sales_Unit, 
+    PERCENTILE_CONT(slope, 0.5) over(partition by SalesOrg, Article, Sales_Unit) as median_slope,
+    PERCENTILE_CONT(y_intercept, 0.5) over(partition by SalesOrg, Article, Sales_Unit) as median_y_intercept
+    from `gcp-wow-finance-de-lab-dev.price_elasticity.siteArticleSUsummary`
+    );
+    
+    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMeans` as (
     select SalesOrg, Article, Sales_Unit, 
     avg(y_intercept) as mean_y_intercept, avg(slope) as mean_slope, stddev(slope) as stddev_slope,
     avg( (case when slope < -1 then 1 else 0 end) ) as prob_elastic,
@@ -139,6 +146,14 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     order by SalesOrg, Article, Sales_Unit
     );
     
+    create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist` as (
+    select a.*, b.median_slope, b.median_y_intercept
+    from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMeans` a
+    inner join
+    `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMedians` b
+    on (a.SalesOrg=b.SalesOrg) and (a.Article=b.Article) and (a.Sales_Unit=b.Sales_Unit)
+    );
+    
     create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` as (
     select dateFrom as from_date, dateTo as to_date,
     c.DepartmentDescription,c.CategoryDescription, c.Sub_CategoryDescription,c.SegmentDescription, c.MerchandiseManagerName, c.CategoryManagerName,
@@ -146,6 +161,7 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     a.*, 
     b.past12m_Sales_ExclTax, b.past4w_Sales_ExclTax, b.past13w_Sales_ExclTax, b.past7d_Sales_ExclTax,
     b.past12m_Promo_Sales, b.past4w_Promo_Sales, b.past13w_Promo_Sales, b.past7d_Promo_Sales,
+    b.ASP_whenNotOnPromo,
     
     safeDiv(b.past12m_Promo_Sales, b.past12m_Sales_ExclTax) as past12m_perc_sales_promo_sales,
     safeDiv(b.past4w_Promo_Sales, b.past4w_Sales_ExclTax) as past4w_perc_sales_promo_sales,
@@ -171,7 +187,11 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     sum( (case when Offer_Id not in ('', 'UNK') and Offer_Id is not null and
     Calendar_Day >= DATE_SUB(CURRENT_DATE(), INTERVAL (7*13) DAY) then Promo_Sales else 0 end)) as past13w_Promo_Sales,
     sum( (case when Offer_Id not in ('', 'UNK') and Offer_Id is not null and
-    Calendar_Day >= DATE_SUB(CURRENT_DATE(), INTERVAL (7*1) DAY) then Promo_Sales else 0 end)) as past7d_Promo_Sales
+    Calendar_Day >= DATE_SUB(CURRENT_DATE(), INTERVAL (7*1) DAY) then Promo_Sales else 0 end)) as past7d_Promo_Sales,
+    
+    if(sum(if(Offer_Id not in ('', 'UNK'),Sales_Qty_SUoM,0))=0,NULL,
+    sum(if(Offer_Id not in ('', 'UNK'),Sales_ExclTax,0))/sum(if(Offer_Id not in ('', 'UNK'),Sales_Qty_SUoM,0))
+    ) as ASP_whenNotOnPromo
     
     FROM  `gcp-wow-ent-im-tbl-prod.gs_allgrp_fin_data.fin_group_profit_v`
     WHERE
