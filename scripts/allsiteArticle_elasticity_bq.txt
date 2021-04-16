@@ -137,7 +137,9 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     PERCENTILE_CONT(slope, 0.05) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_05,
     PERCENTILE_CONT(slope, 0.95) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_95,
     PERCENTILE_CONT(slope, 0.01) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_01,
-    PERCENTILE_CONT(slope, 0.99) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_99
+    PERCENTILE_CONT(slope, 0.99) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_99,
+    PERCENTILE_CONT(slope, 0.25) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_25,
+    PERCENTILE_CONT(slope, 0.75) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_75
     
     from `gcp-wow-finance-de-lab-dev.price_elasticity.siteArticleSUsummary`
     );
@@ -158,6 +160,7 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     select a.*, 
     b.median_slope, b.median_y_intercept,
     b.slope_quantile_25, b.slope_quantile_75, b.slope_quantile_10, b.slope_quantile_90, b.slope_quantile_05, b.slope_quantile_95, b.slope_quantile_01, b.slope_quantile_99
+    
     from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMeans` a
     inner join
     `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMedians` b
