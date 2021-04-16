@@ -1,6 +1,6 @@
 DECLARE lagDays int64 DEFAULT 7;
-DECLARE minUnders int64 DEFAULT 6;
-DECLARE minOvers int64 DEFAULT 6;
+DECLARE minUnders int64 DEFAULT 14;
+DECLARE minOvers int64 DEFAULT 14;
 DECLARE cats ARRAY <STRING>;
 DECLARE so ARRAY <STRING>;
 DECLARE dateFrom DATE;
@@ -130,7 +130,15 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMedians` as (
     select distinct SalesOrg, Article, Sales_Unit, 
     PERCENTILE_CONT(slope, 0.5) over(partition by SalesOrg, Article, Sales_Unit) as median_slope,
-    PERCENTILE_CONT(y_intercept, 0.5) over(partition by SalesOrg, Article, Sales_Unit) as median_y_intercept
+    PERCENTILE_CONT(y_intercept, 0.5) over(partition by SalesOrg, Article, Sales_Unit) as median_y_intercept,
+    
+    PERCENTILE_CONT(slope, 0.1) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_10,
+    PERCENTILE_CONT(slope, 0.9) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_90,
+    PERCENTILE_CONT(slope, 0.05) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_05,
+    PERCENTILE_CONT(slope, 0.95) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_95,
+    PERCENTILE_CONT(slope, 0.01) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_01,
+    PERCENTILE_CONT(slope, 0.99) over(partition by SalesOrg, Article, Sales_Unit) as slope_quantile_99
+    
     from `gcp-wow-finance-de-lab-dev.price_elasticity.siteArticleSUsummary`
     );
     
@@ -147,7 +155,9 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     );
     
     create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist` as (
-    select a.*, b.median_slope, b.median_y_intercept
+    select a.*, 
+    b.median_slope, b.median_y_intercept,
+    b.slope_quantile_10, b.slope_quantile_90, b.slope_quantile_05, b.slope_quantile_95, b.slope_quantile_01, b.slope_quantile_99
     from `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMeans` a
     inner join
     `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMedians` b
