@@ -23,6 +23,17 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     ifnull(Site,'') as Site,
     ifnull(Article,'') as Article,
     ifnull((case when Sales_Unit in ('CA1','CA2','CA3') then 'CAR' else Sales_Unit end),'') as Sales_Unit, 
+    
+    ifnull(Article_Description, '') as Article_Description,
+    ifnull(Category_Description, '') as Category_Description, 
+    ifnull(SubCategory_Description, '') as SubCategory_Description, 
+    ifnull(Segment_Description, '') as Segment_Description, 
+    ifnull(Department_Description, '') AS DEPARTMENT_DESCRIPTION,
+    ifnull(GeneralManager_Name, '') as GM_DESCRIPTION,
+    ifnull(MerchandiseManager_Name, '') AS MM_DESCRIPTION,
+    ifnull(MerchandiseManager_Department, '') as MM_Department,
+    ifnull((case when Price_Family_Description is null or Price_Family_Description = '' then Article_Description else Price_Family_Description end), '') as Price_Family_Description,
+    
     Calendar_Day
     , DATE_ADD(Calendar_Day, INTERVAL -lagDays DAY) as lag_Calendar_Day
     , sum(Sales_ExclTax) as Sales_ExclTax
@@ -38,11 +49,7 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     --Calendar_Day between dateFrom AND dateTo
     Calendar_Day >= dateFrom AND 
     Calendar_Day < dateTo
-    group by ifnull(SalesOrg,''),
-    ifnull(Site,''),
-    ifnull(Article,''),
-    ifnull((case when Sales_Unit in ('CA1','CA2','CA3') then 'CAR' else Sales_Unit end),''), 
-    Calendar_Day
+    group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14
     )
     select a.*,
     a.Sales_ExclTax-b.Sales_ExclTax as Sales_ExclTax_diff,
@@ -72,7 +79,17 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     (a.SalesOrg = b.SalesOrg) and
     (a.Site = b.Site) and
     (a.Article=b.Article) AND
-    (a.Sales_Unit=b.Sales_Unit)
+    (a.Sales_Unit=b.Sales_Unit) AND
+    (a.Article_Description=b.Article_Description) AND
+    (a.Category_Description=b.Category_Description) AND
+    (a.SubCategory_Description=b.SubCategory_Description) AND
+    (a.Segment_Description=b.Segment_Description) AND
+    (a.Department_Description=b.Department_Description) AND
+    (a.GM_DESCRIPTION=b.GM_DESCRIPTION) AND
+    (a.MM_DESCRIPTION=b.MM_DESCRIPTION) AND
+    (a.MM_Department=b.MM_Department) AND
+    (a.Price_Family_Description=b.Price_Family_Description)  
+        
     where
     b.Sales_Qty_SUoM > 0 AND
     b.Sales_Qty_SUoM is not null AND
@@ -85,6 +102,10 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
 
     create temp table addit_cols as (
     SELECT a.SalesOrg, a.Site, a.Article, a.Sales_Unit,
+    
+    a.Article_Description, a.Category_Description, a.SubCategory_Description, a.Segment_Description, a.DEPARTMENT_DESCRIPTION,a.GM_DESCRIPTION,a.MM_DESCRIPTION,
+    a.MM_Department,a.Price_Family_Description,
+    
     avg(a.log_ASP_v_lag) as mean_x,
     avg(a.log_Sales_Qty_SUoM_v_lag) as mean_y,
     corr(a.log_ASP_v_lag, log_Sales_Qty_SUoM_v_lag) as corr_xy,
@@ -97,7 +118,7 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     sum(Sales_Qty_SUoM) as Sales_Qty_SUoM,
     (case when sum(Sales_Qty_SUoM) = 0 then null else sum(Sales_ExclTax)/sum(Sales_Qty_SUoM) end) as ASP
     FROM `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElastData` a
-    group by a.SalesOrg, a.Site, a.Article, a.Sales_Unit
+    group by 1,2,3,4,5,6,7,8,9,10,11,12,13
     );
     
 --     create temp table paste12mSales as (
@@ -129,6 +150,10 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     
     create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMedians` as (
     select distinct SalesOrg, Article, Sales_Unit, 
+    
+    Article_Description, Category_Description, SubCategory_Description, Segment_Description, DEPARTMENT_DESCRIPTION,GM_DESCRIPTION,MM_DESCRIPTION,
+    MM_Department,Price_Family_Description,
+    
     PERCENTILE_CONT(slope, 0.5) over(partition by SalesOrg, Article, Sales_Unit) as median_slope,
     PERCENTILE_CONT(y_intercept, 0.5) over(partition by SalesOrg, Article, Sales_Unit) as median_y_intercept,
     
@@ -146,12 +171,16 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     
     create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_distMeans` as (
     select SalesOrg, Article, Sales_Unit, 
+    
+    Article_Description, Category_Description, SubCategory_Description, Segment_Description, DEPARTMENT_DESCRIPTION,GM_DESCRIPTION,MM_DESCRIPTION,
+    MM_Department,Price_Family_Description,
+    
     avg(y_intercept) as mean_y_intercept, avg(slope) as mean_slope, stddev(slope) as stddev_slope,
     avg( (case when slope < -1 then 1 else 0 end) ) as prob_elastic,
     count(*) as n
     #from int_slope
     from `gcp-wow-finance-de-lab-dev.price_elasticity.siteArticleSUsummary`
-    group by SalesOrg, Article, Sales_Unit
+    group by 1,2,3,4,5,6,7,8,9,10,11,12
     having  count(*) >= 10
     order by SalesOrg, Article, Sales_Unit
     );
@@ -169,8 +198,8 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     
     create or replace table `gcp-wow-finance-de-lab-dev.price_elasticity.PriceElast_dist_details` as (
     select dateFrom as from_date, dateTo as to_date,
-    c.DepartmentDescription,c.CategoryDescription, c.Sub_CategoryDescription,c.SegmentDescription, c.MerchandiseManagerName, c.CategoryManagerName,
-    d.Article_Description,
+    --c.DepartmentDescription,c.CategoryDescription, c.Sub_CategoryDescription,c.SegmentDescription, c.MerchandiseManagerName, c.CategoryManagerName,
+    --d.Article_Description,
     a.*, 
     b.past12m_Sales_ExclTax, b.past4w_Sales_ExclTax, b.past13w_Sales_ExclTax, b.past7d_Sales_ExclTax,
     b.past12m_Promo_Sales, b.past4w_Promo_Sales, b.past13w_Promo_Sales, b.past7d_Promo_Sales,
@@ -213,8 +242,9 @@ CREATE TEMP FUNCTION safeDiv(numerator FLOAT64, denominator FLOAT64) AS ((case w
     ifnull(Article,''),
     ifnull((case when Sales_Unit in ('CA1','CA2','CA3') then 'CAR' else Sales_Unit end),'')
     ) b on (a.SalesOrg=b.SalesOrg) and (a.Article=b.Article) and (a.Sales_Unit=b.Sales_Unit)
-    inner join
-    `gcp-wow-ent-im-tbl-prod.adp_masterdata_view.dim_article_hierarchy_curr_v` c on (a.SalesOrg=c.SalesOrg) and (a.Article=c.Article)
+    
+    --inner join `gcp-wow-ent-im-tbl-prod.adp_masterdata_view.dim_article_hierarchy_curr_v` c on (a.SalesOrg=c.SalesOrg) and (a.Article=c.Article)
+    
     inner join (
     select distinct  ifnull(SalesOrg,'') as SalesOrg, ifnull(Article,'') as Article,  ifnull(Article_Description,'') as Article_Description
     from `gcp-wow-ent-im-tbl-prod.gs_allgrp_fin_data.fin_group_profit_v`
